@@ -9,7 +9,7 @@ export const storage = getStorageManager();
 
 const BIDDER_CODE = 'livewrapped';
 export const URL = 'https://lwadm.com/ad';
-const VERSION = '1.4';
+const VERSION = '1.5';
 
 export const spec = {
   code: BIDDER_CODE,
@@ -32,6 +32,7 @@ export const spec = {
    * ifa:         Advertising ID                      Optional.
    * bundle:      App bundle                          Optional. Read from config if exists.
    * options      Dynamic data                        Optional. Optional data to send into adapter.
+   * flr          Floor price                         Optional. Floor price in bidding currency.
    *
    * @param {BidRequest} bid The bid params to validate.
    * @return boolean True if this is a valid bid, and false otherwise.
@@ -213,13 +214,16 @@ function hasPubcid(bid) {
 }
 
 function bidToAdRequest(bid) {
-  var adRequest = {
+  let floor = getFloor(bid);
+  let adRequest = {
     adUnitId: bid.params.adUnitId,
     callerAdUnitId: bid.params.adUnitName || bid.adUnitCode || bid.placementCode,
     bidId: bid.bidId,
     transactionId: bid.transactionId,
     formats: getSizes(bid).map(sizeToFormat),
-    options: bid.params.options
+    options: bid.params.options,
+    flr: floor.floor,
+    flrCur: floor.floorCurrency
   };
 
   if (bid.auc !== undefined) {
@@ -235,6 +239,24 @@ function bidToAdRequest(bid) {
   }
 
   return adRequest;
+}
+
+function getFloor(bid) {
+  let floorInfo = {};
+  const currency = config.getConfig('currency.adServerCurrency');
+
+  if (typeof bid.getFloor === 'function') {
+    floorInfo = bid.getFloor({
+      currency: currency,
+      mediaType: '*',
+      size: '*'
+    });
+  }
+
+  return {
+    floor: floorInfo.floor || bid.params.flr,
+    floorCurrency: floorInfo.currency || bid.params.flrCur
+  };
 }
 
 function getSizes(bid) {
